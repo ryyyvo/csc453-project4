@@ -26,6 +26,10 @@ int openDisk(char *filename, int nBytes){
 	}
 	else if(nBytes > BLOCKSIZE){
 	/*files content may be overwritten*/
+		FILE *fptr = fopen(filename, "w");
+		if(!fptr){	
+			return diskNotExist;
+		}
 	}
 
 	return 0;
@@ -35,7 +39,18 @@ int openDisk(char *filename, int nBytes){
 int closeDisk(int disk){
 }
 
+/* readBlock() reads an entire block of BLOCKSIZE bytes from the open
+disk (identified by ‘disk’) and copies the result into a local buffer
+(must be at least of BLOCKSIZE bytes). The bNum is a logical block
+number, which must be translated into a byte offset within the disk. The
+translation from logical to physical block is straightforward: bNum=0
+is the very first byte of the file. bNum=1 is BLOCKSIZE bytes into the
+disk, bNum=n is n*BLOCKSIZE bytes into the disk. On success, it returns
+0. -1 or smaller is returned if disk is not available (hasn’t been
+opened) or any other failures. You must define your own error code
+system. */
 int readBlock(int disk, int bNum, void *block){
+	
 }
 
 int writeBlock(int disk, int bNum, void *block){
