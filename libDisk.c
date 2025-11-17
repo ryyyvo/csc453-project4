@@ -1,8 +1,8 @@
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
-#include <error.h>
 #include <unistd.h>
+#include "error.h"
 
 #define BLOCKSIZE 256
 
@@ -38,5 +38,5 @@ int closeDisk(int disk){
 int readBlock(int disk, int bNum, void *block){
 }
 
-int writeBlock(int disk, intbNum, void *block){
+int writeBlock(int disk, int bNum, void *block){
 }
