@@ -22,15 +22,15 @@ int openDisk(char *filename, int nBytes) {
 		}
 		return fileno(fptr);
 	}
-	if (nBytes % BLOCKSIZE != 0) {
-		nBytes -= (nBytes%BLOCKSIZE);	
-		fptr = fopen(filename, "w+");//w+ if file new
-		if (!fptr){
-			printf("can't create file");
-			return -4; //make error for fopen failure
 
-		}
+	
+	nBytes -= (nBytes%BLOCKSIZE);	
+	fptr = fopen(filename, "w+");//w+ if file new
+	if (!fptr){
+		printf("can't create file");
+		return -4; //make error for fopen failure
 	}
+	
 
 	char emptyData = 0;
 	for(int i = 0; i<nBytes; i++){
@@ -61,15 +61,10 @@ disk, bNum=n is n*BLOCKSIZE bytes into the disk. On success, it returns
 opened) or any other failures. You must define your own error code
 system. */
 
-/* only reads 256 bytes per call? same size as buffer. file divided into 256 bytes sized blocks
- * so bNum tells you which block number you want to read from <= so have to calculate an offset(multiply by 
- * 256) */
 
 int readBlock(int disk, int bNum, void *block){
-	//error checking for valid bNum? 
-	/*char buffer[BLOCKSIZE];*/
-	block = malloc(sizeof(char)*BLOCKSIZE);
-	if(lseek(disk, bNum * BLOCKSIZE, SEEK_SET) == -1){
+	off_t offset = bNum * BLOCKSIZE; 
+	if(lseek(disk, offset, SEEK_SET) == -1){
 		return readBlockFuncFailure; 
 	}
 	if(read(disk, block, BLOCKSIZE) == -1){
@@ -79,4 +74,13 @@ int readBlock(int disk, int bNum, void *block){
 }
 
 int writeBlock(int disk, int bNum, void *block){
+	off_t offset = bNum * BLOCKSIZE;
+	if(lseek(disk, offset, SEEK_SET) == -1){
+        return writeBlockFuncFailure; 
+    }
+	if(write(disk, block, BLOCKSIZE) == -1){
+		return writeBlockFuncFailure;
+	}
+	return 0;
+	//check if disk still has space to be written to
 }
