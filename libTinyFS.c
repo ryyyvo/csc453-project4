@@ -8,9 +8,7 @@
 #define BLOCKSIZE 256
 #define DEFAULT_DISK_SIZE 10240
 #define DEFAULT_DISK_NAME “tinyFSDisk”
-#define DEFAULT_DISK_NAME “tinyFSDisk”
-
-
+typedef int fileDescriptor;
 
 int tfs_mkfs(char *filename, int nBytes){
 	int disk = openDisk(filename, nBytes);
@@ -27,13 +25,23 @@ int tfs_mkfs(char *filename, int nBytes){
 	superblock[1] = 0x44;
 	superblock[2] = 1; //bc inode will be block 1
 	//need to implement free block listsuperblock[3] = ;
+	//superblock[3] = free block list pointer <= numBlocks - 2;
 	writeBlock(disk, 1, superblock);
 	
 	inode[0] = 2;
 	inode[1] = 0x44;
-	//how do you want 
+	//linked list of structs? 
 	//use writeFile to...
 	
+	//leave block 3 blank?? why?
+
+	//for loop for teh rest of the blocks to initilize as free blocks
+	//char freeBlock[BLOCKSIZE]
+	//freeBlock[0] = 4;
+	//freeBlock[1] = 0x44;
+	//freeBlock[2] = 4?
+	
+
 	//first block is superblock
 	//second block is inode
 	//thirds block is file extent
@@ -55,7 +63,6 @@ fileDescriptor tfs_openFile(char *name);
 
 int tfs_closeFile(fileDescriptor FD){
 	closeDisk(FD);
-
 }
 int tfs_writeFile(fileDescriptor FD, char *buffer, int size);
 
@@ -63,4 +70,6 @@ int tfs_deleteFile(fileDescriptor FD);
 
 int tfs_readByte(fileDescriptor FD, char *buffer);
 
-int tfs_seek(fileDescriptor FD, int offset);
+int tfs_seek(fileDescriptor FD, int offset){
+	//lseek
+}
