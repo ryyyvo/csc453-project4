@@ -6,26 +6,26 @@
 
 #define BLOCKSIZE 256
 
-int openDisk(char *filename, int nBytes){
+int openDisk(char *filename, int nBytes) {
 	FILE *fptr;
-	if (nBytes < BLOCKSIZE){
+	if (nBytes < BLOCKSIZE) {
 		printf("nbytes less than blocksize not allowed");
 		return invalidNByteSize; //failure
 	}
-	if(nBytes == 0){
-		//existing disk open, but have to double check
-		//	content must NOT be overwritten
-		//if file doesn't exist, return diskNotExist 
+	if (nBytes == 0) {
+		// existing disk open, but have to double check
+		// content must NOT be overwritten
+		// if file doesn't exist, return diskNotExist 
 		fptr = fopen(filename, "r+"); //r+ only works if it exists
-		if(!fptr){
+		if (!fptr){
 			return diskNotExist;
 		}
 		return fileno(fptr);
 	}
-	if (nBytes % BLOCKSIZE != 0){
+	if (nBytes % BLOCKSIZE != 0) {
 		nBytes -= (nBytes%BLOCKSIZE);	
 		fptr = fopen(filename, "w+");//w+ if file new
-		if(!fptr){
+		if (!fptr){
 			printf("can't create file");
 			return -4; //make error for fopen failure
 
@@ -38,15 +38,12 @@ int openDisk(char *filename, int nBytes){
 	}
 	fflush(fptr);
 	
-
-
 	return fileno(fptr);
 }
 
-
 int closeDisk(int disk){
 	//do we have to check if disk is a valid param?
-	if(fclose(disk) == -1){
+	if (fclose(disk) == -1) {
 		return fileCloseFailure;
 	}	
 
