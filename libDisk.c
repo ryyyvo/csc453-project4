@@ -6,8 +6,11 @@
 
 #define BLOCKSIZE 256
 
+
+
 int openDisk(char *filename, int nBytes) {
-	FILE *fptr;
+	//FILE *fptr;
+	int fd;
 	if (nBytes < BLOCKSIZE) {
 		printf("nbytes less than blocksize not allowed");
 		return invalidNByteSize; //failure
@@ -16,8 +19,9 @@ int openDisk(char *filename, int nBytes) {
 		// existing disk open, but have to double check
 		// content must NOT be overwritten
 		// if file doesn't exist, return diskNotExist 
-		fptr = fopen(filename, "r+"); //r+ only works if it exists
-		if (!fptr){
+		//fptr = fopen(filename, "r+"); //r+ only works if it exists
+		
+	if (!fptr){
 			return diskNotExist;
 		}
 		return fileno(fptr);
@@ -34,7 +38,7 @@ int openDisk(char *filename, int nBytes) {
 
 	char emptyData = 0;
 	for(int i = 0; i<nBytes; i++){
-		fwrite(&emptyData,sizeof(emptyData), 1, fptr);	
+		write(&emptyData,sizeof(emptyData), 1, fptr);	
 	}
 	fflush(fptr);
 	
