@@ -142,11 +142,17 @@ int tfs_mount(char *diskname)
 int tfs_unmount(void)
 {
 	if (curr_mounted_disk == -1)
-	{			   // nthg to unmount
-		return -1; // add in correct error code
+	{
+		return -1; // no disk currently mounted (add error code ?)
 	}
-	closeDisk(curr_mounted_disk);
+
+	if (closeDisk(curr_mounted_disk) < 0)
+	{
+		return fileCloseFailure;
+	}
+
 	curr_mounted_disk = -1;
+	return 0;
 }
 
 fileDescriptor tfs_openFile(char *name);
