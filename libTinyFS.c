@@ -96,35 +96,49 @@ inodes, etc. Must return a specified success/error code. */
 
 int tfs_mount(char *diskname)
 {
+	/* tfs_mount(char *diskname) “mounts” a TinyFS file system located within
+	‘diskname’. tfs_unmount(void) “unmounts” the currently mounted file
+	system. As part of the mount operation, tfs_mount should verify the file
+	system is the correct type. In tinyFS, only one file system may be
+	mounted at a time. Use tfs_unmount to cleanly unmount the currently
+	mounted file system. Must return a specified success/error code. */
 	if (curr_mounted_disk != -1)
 	{
 		return alreadyMounted;
 	}
-	int disk = openDisk(filename, nBytes);
+
+	int disk = openDisk(diskname, 0);
 	if (disk < 0)
 	{
-		return -1; // DECLARE ERROR
+		return disk; // return error code from openDisk
 	}
 
-	curr_mounted = disk;
-	// from instructions: tfs_mount should verify the file
-	// system is the correct type
-	// 0x44 -second byte of every block- is how you check if file is valid
-
+	// verify
 	char buffer[BLOCKSIZE];
-
-	if (readBlock(disk, 0, buffer) < 0)
+	if (readBlock(disk, SUPERBLOCK_NUM, buffer) < 0)
 	{
-		return -1; // add in correct error code
+		closeDisk(disk);
+		return readBlockFuncFailure;
 	}
+
+	// check magic number ??
 	if (buffer[1] != VALID_BYTE)
 	{
-		printf("file not valid");
-		return -1; // add in correct error code
+		closeDisk(disk);
+		return readBlockFuncFailure;
 	}
 
+	// check block type (byte 0 should be superblock type ?) ??
+	if (buffer[0] != BLOCK_TYPE_SUPERBLOCK)
+	{
+		closeDisk(disk);
+		return readBlockFuncFailure;
+	}
+
+	curr_mounted_disk = disk;
 	return 0;
 }
+
 int tfs_unmount(void)
 {
 	if (curr_mounted_disk == -1)
