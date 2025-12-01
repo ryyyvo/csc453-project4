@@ -9,8 +9,7 @@
 
 int openDisk(char *filename, int nBytes)
 {
-	// FILE *fptr;
-	int fd;
+	FILE *fptr;
 	if (nBytes < BLOCKSIZE)
 	{
 		printf("nbytes less than blocksize not allowed");
