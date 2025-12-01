@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "error.h"
+#include "libDisk.h"
 
 #define BLOCKSIZE 256
 
