@@ -6,7 +6,7 @@
 #include "libDisk.h"
 #include "libTinyFS.h"
 
-int curr_mounted_disk = -1; //-1 means nothing mounted right now
+int curr_mounted_disk = -1; //-1 means nothing mounted
 
 int tfs_mkfs(char *filename, int nBytes)
 /* Makes a blank TinyFS file system of size nBytes on the unix file
@@ -50,12 +50,6 @@ inodes, etc. Must return a specified success/error code. */
 
 	block[0] = BLOCK_TYPE_INODE;
 	block[1] = VALID_BYTE;
-	block[2] = 0x00;
-	block[3] = 0x00;
-	// bytes 4-11: file name
-	// bytes 12-13: file size
-	// bytes 14+: pointers to file extents
-	// all zeroes
 
 	if (writeBlock(disk, ROOT_INODE_NUM, block) < 0)
 	{
@@ -80,8 +74,6 @@ inodes, etc. Must return a specified success/error code. */
 		{
 			block[2] = 0x00; // if no next free block
 		}
-
-		block[3] = 0x00;
 
 		if (writeBlock(disk, i, block) < 0)
 		{
@@ -113,6 +105,8 @@ int tfs_mount(char *diskname)
 		return disk; // return error code from openDisk
 	}
 
+	// make sure only one disk can be mounted
+
 	// verify
 	char buffer[BLOCKSIZE];
 	if (readBlock(disk, SUPERBLOCK_NUM, buffer) < 0)
@@ -121,7 +115,7 @@ int tfs_mount(char *diskname)
 		return readBlockFuncFailure;
 	}
 
-	// check magic number ??
+	// check magic number ?? should be good enough
 	if (buffer[1] != VALID_BYTE)
 	{
 		closeDisk(disk);
