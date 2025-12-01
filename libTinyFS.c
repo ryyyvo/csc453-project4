@@ -31,10 +31,7 @@ inodes, etc. Must return a specified success/error code. */
 
 	// initialize block
 	char block[BLOCKSIZE];
-	for (int i = 0; i < BLOCKSIZE; i++)
-	{
-		block[i] = 0x00;
-	}
+	memset(block, 0x00, BLOCKSIZE);
 
 	// superblock creation
 	block[0] = BLOCK_TYPE_SUPERBLOCK;
@@ -49,10 +46,7 @@ inodes, etc. Must return a specified success/error code. */
 	}
 
 	// write root inode
-	for (int i = 0; i < BLOCKSIZE; i++)
-	{
-		block[i] = 0x00;
-	}
+	memset(block, 0x00, BLOCKSIZE);
 
 	block[0] = BLOCK_TYPE_INODE;
 	block[1] = VALID_BYTE;
@@ -72,10 +66,7 @@ inodes, etc. Must return a specified success/error code. */
 	// initialize remaining blocks as free blocks
 	for (int i = 2; i < numBlocks; i++)
 	{
-		for (int j = 0; j < BLOCKSIZE; j++)
-		{
-			block[j] = 0x00;
-		}
+		memset(block, 0x00, BLOCKSIZE);
 
 		block[0] = BLOCK_TYPE_FREE;
 		block[1] = VALID_BYTE;
