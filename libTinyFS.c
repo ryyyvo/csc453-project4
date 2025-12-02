@@ -2,11 +2,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include "error.h"
 #include "libDisk.h"
 #include "libTinyFS.h"
 #include <string.h>
 int curr_mounted_disk = -1; //-1 means nothing mounted
+FileTableEntry *openFileTable = NULL;
+int nextFD = 0;
 
 int tfs_mkfs(char *filename, int nBytes)
 /* Makes a blank TinyFS file system of size nBytes on the unix file
@@ -156,12 +159,168 @@ int tfs_unmount(void)
 	return 0;
 }
 
-fileDescriptor tfs_openFile(char *name);
+fileDescriptor tfs_openFile(char *name)
+/* Creates or Opens a file for reading and writing on the currently
+mounted file system. Creates a dynamic resource table entry for the file,
+and returns a file descriptor (integer) that can be used to reference
+this entry while the filesystem is mounted. */
+{
+	if (curr_mounted_disk == -1)
+	{
+		return -1;
+	}
+
+	int nameLen = strlen(name);
+	if (nameLen == 0 || nameLen > 8)
+	{
+		return -1;
+	}
+
+	// search for existing file in inode chain
+	char block[BLOCKSIZE];
+	int currentInodeBlock = ROOT_INODE_NUM;
+	int foundInodeBlock = -1;
+
+	if (readBlock(curr_mounted_disk, ROOT_INODE_NUM, block) < 0)
+	{
+		return readBlockFuncFailure;
+	}
+
+	// traverse inode linked list
+	while (currentInodeBlock != 0)
+	{
+		if (readBlock(curr_mounted_disk, currentInodeBlock, block) < 0)
+		{
+			return readBlockFuncFailure;
+		}
+
+		// check if inode has a filename (bytes 4-11)
+		int hasFilename = 0;
+		for (int i = 4; i < 12; i++)
+		{
+			if (block[i] != 0x00)
+			{
+				hasFilename = 1;
+				break;
+			}
+		}
+
+		// compare filenames
+		if (hasFilename)
+		{
+			int match = 1;
+			for (int i = 0; i < nameLen; i++)
+			{
+				if (block[4 + i] != name[i])
+				{
+					match = 0;
+					break;
+				}
+			}
+			// check bytes are 0x00
+			for (int i = nameLen; i < 8 && match; i++)
+			{
+				if (block[4 + i] != 0x00)
+				{
+					match = 0;
+					break;
+				}
+			}
+
+			if (match)
+			{
+				foundInodeBlock = currentInodeBlock;
+				break;
+			}
+		}
+
+		// move to next inode in chain (byte 2)
+		currentInodeBlock = (unsigned char)block[2];
+	}
+
+	// create new inode
+	if (foundInodeBlock == -1)
+	{
+		// get first free block
+		if (readBlock(curr_mounted_disk, SUPERBLOCK_NUM, block) < 0)
+		{
+			return readBlockFuncFailure;
+		}
+
+		int freeBlock = (unsigned char)block[2];
+		if (freeBlock == 0)
+		{
+			return -1;
+		}
+
+		// read free block to get next free block
+		char freeBlockData[BLOCKSIZE];
+		if (readBlock(curr_mounted_disk, freeBlock, freeBlockData) < 0)
+		{
+			return readBlockFuncFailure;
+		}
+		int nextFreeBlock = (unsigned char)freeBlockData[2];
+
+		// update superblock to point to next free block
+		block[2] = nextFreeBlock;
+		if (writeBlock(curr_mounted_disk, SUPERBLOCK_NUM, block) < 0)
+		{
+			return writeBlockFuncFailure;
+		}
+
+		// initialize new inode block
+		memset(freeBlockData, 0x00, BLOCKSIZE);
+		freeBlockData[0] = BLOCK_TYPE_INODE;
+		freeBlockData[1] = VALID_BYTE;
+
+		// copy filename (bytes 4-11)
+		for (int i = 0; i < nameLen; i++)
+		{
+			freeBlockData[4 + i] = name[i];
+		}
+
+		// write new inode to disk
+		if (writeBlock(curr_mounted_disk, freeBlock, freeBlockData) < 0)
+		{
+			return writeBlockFuncFailure;
+		}
+
+		// link new inode to root inode's chain
+		if (readBlock(curr_mounted_disk, ROOT_INODE_NUM, block) < 0)
+		{
+			return readBlockFuncFailure;
+		}
+		block[2] = freeBlock; // root inode now points to new inode
+		if (writeBlock(curr_mounted_disk, ROOT_INODE_NUM, block) < 0)
+		{
+			return writeBlockFuncFailure;
+		}
+
+		foundInodeBlock = freeBlock;
+	}
+
+	FileTableEntry *newEntry = (FileTableEntry *)malloc(sizeof(FileTableEntry));
+	if (!newEntry)
+	{
+		return -1;
+	}
+
+	newEntry->fd = nextFD++;
+	strncpy(newEntry->filename, name, 8);
+	newEntry->filename[8] = '\0';
+	newEntry->inodeBlockNum = foundInodeBlock;
+	newEntry->currentOffset = 0;
+	newEntry->next = openFileTable;
+	openFileTable = newEntry;
+
+	return newEntry->fd;
+}
 
 int tfs_closeFile(fileDescriptor FD)
 {
 	closeDisk(FD);
-}
+};
+
 int tfs_writeFile(fileDescriptor FD, char *buffer, int size);
 
 int tfs_deleteFile(fileDescriptor FD);

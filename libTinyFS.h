@@ -13,6 +13,16 @@
 #define SUPERBLOCK_NUM 0
 #define ROOT_INODE_NUM 1
 
+// tracks open files
+typedef struct FileTableEntry
+{
+    fileDescriptor fd;
+    char filename[9];
+    int inodeBlockNum;
+    int currentOffset;
+    struct FileTableEntry *next;
+} FileTableEntry;
+
 typedef int fileDescriptor;
 
 // function prototypes
