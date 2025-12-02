@@ -5,7 +5,7 @@
 #include "error.h"
 #include "libDisk.h"
 #include "libTinyFS.h"
-
+#include <string.h>
 int curr_mounted_disk = -1; //-1 means nothing mounted
 
 int tfs_mkfs(char *filename, int nBytes)
@@ -22,23 +22,29 @@ inodes, etc. Must return a specified success/error code. */
 		return disk; // return error code from openDisk
 	}
 
-	int numBlocks = nBytes / BLOCKSIZE;
-	if (numBlocks < 2)
+	int numBlocks = (nBytes - (nBytes%BLOCKSIZE)) / BLOCKSIZE;
+	if (numBlocks < 3) //need atleast one free block to store something, or it's a useless file
 	{
 		closeDisk(disk);
 		return invalidNByteSize;
 	}
 
-	// initialize block
+	// initialize block #1
 	char block[BLOCKSIZE];
 	memset(block, 0x00, BLOCKSIZE);
 
 	// superblock creation
 	block[0] = BLOCK_TYPE_SUPERBLOCK;
 	block[1] = VALID_BYTE;
-	block[2] = 2;			   // pointer to first free block
-	block[3] = ROOT_INODE_NUM; // root inode is at block 1
 
+	//byte 3 must be EMPTY so shifting things  a lil
+	//block[2] = 2;			   // pointer to first free block
+	//block[3] = ROOT_INODE_NUM; // root inode is at block 1
+	
+
+	block[2] = 2; //store pointer to free block
+	block[3] = 0x00; //byte3 must be empty for all blocks
+	block[4] = ROOT_INODE_NUM; //root inode
 	if (writeBlock(disk, SUPERBLOCK_NUM, block) < 0)
 	{
 		closeDisk(disk);
@@ -75,6 +81,7 @@ inodes, etc. Must return a specified success/error code. */
 			block[2] = 0x00; // if no next free block
 		}
 
+		block[3] = 0x00;
 		if (writeBlock(disk, i, block) < 0)
 		{
 			closeDisk(disk);
