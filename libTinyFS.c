@@ -25,8 +25,8 @@ inodes, etc. Must return a specified success/error code. */
 		return disk; // return error code from openDisk
 	}
 
-	int numBlocks = (nBytes - (nBytes%BLOCKSIZE)) / BLOCKSIZE;
-	if (numBlocks < 3) //need atleast one free block to store something, or it's a useless file
+	int numBlocks = (nBytes - (nBytes % BLOCKSIZE)) / BLOCKSIZE;
+	if (numBlocks < 3) // need atleast one free block to store something, or it's a useless file
 	{
 		closeDisk(disk);
 		return invalidNByteSize;
@@ -40,14 +40,13 @@ inodes, etc. Must return a specified success/error code. */
 	block[0] = BLOCK_TYPE_SUPERBLOCK;
 	block[1] = VALID_BYTE;
 
-	//byte 3 must be EMPTY so shifting things  a lil
-	//block[2] = 2;			   // pointer to first free block
-	//block[3] = ROOT_INODE_NUM; // root inode is at block 1
-	
+	// byte 3 must be EMPTY so shifting things  a lil
+	// block[2] = 2;			   // pointer to first free block
+	// block[3] = ROOT_INODE_NUM; // root inode is at block 1
 
-	block[2] = 2; //store pointer to free block
-	block[3] = 0x00; //byte3 must be empty for all blocks
-	block[4] = ROOT_INODE_NUM; //root inode
+	block[2] = 2;			   // store pointer to free block
+	block[3] = 0x00;		   // byte3 must be empty for all blocks
+	block[4] = ROOT_INODE_NUM; // root inode
 	if (writeBlock(disk, SUPERBLOCK_NUM, block) < 0)
 	{
 		closeDisk(disk);
@@ -317,9 +316,42 @@ this entry while the filesystem is mounted. */
 }
 
 int tfs_closeFile(fileDescriptor FD)
+/* Closes the file, de-allocates all system resources, and removes table
+entry */
 {
-	closeDisk(FD);
-};
+	if (FD < 0)
+	{
+		return invalidFileDescriptor;
+	}
+
+	// search for the file descriptor in open file table
+	FileTableEntry *current = openFileTable;
+	FileTableEntry *prev = NULL;
+
+	while (current != NULL)
+	{
+		if (current->fd == FD)
+		{
+			if (prev == NULL)
+			{
+				// removing head of list
+				openFileTable = current->next;
+			}
+			else
+			{
+				// remove middle/end
+				prev->next = current->next;
+			}
+
+			free(current);
+			return 0;
+		}
+
+		prev = current;
+		current = current->next;
+	}
+	return invalidFileDescriptor;
+}
 
 int tfs_writeFile(fileDescriptor FD, char *buffer, int size);
 

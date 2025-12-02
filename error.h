@@ -4,3 +4,4 @@
 #define readBlockFuncFailure -4
 #define writeBlockFuncFailure -5
 #define alreadyMounted -6
+#define invalidFileDescriptor -7
