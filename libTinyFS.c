@@ -4,102 +4,155 @@
 #include <unistd.h>
 #include "error.h"
 #include "libDisk.h"
+#include "libTinyFS.h"
 
-#define BLOCKSIZE 256
-#define DEFAULT_DISK_SIZE 10240
-#define DEFAULT_DISK_NAME “tinyFSDisk”
-#define VALID_BYTE 0x44
+int curr_mounted_disk = -1; //-1 means nothing mounted
 
-typedef int fileDescriptor;
-int curr_mounted_disk = -1; //-1 means nothing mounted right now
-
-int tfs_mkfs(char *filename, int nBytes){
+int tfs_mkfs(char *filename, int nBytes)
+/* Makes a blank TinyFS file system of size nBytes on the unix file
+specified by ‘filename’. This function should use the emulated disk
+library to open the specified unix file, and upon success, format the
+file to be a mountable disk. This includes initializing all data to 0x00,
+setting magic numbers, initializing and writing the superblock and
+inodes, etc. Must return a specified success/error code. */
+{
 	int disk = openDisk(filename, nBytes);
-	int numBlocks = nBytes/BLOCKSIZE;
-	if(disk<0){
-		return -1; //DECLARE ERROR	
-	}
-		
-	char superblock[BLOCKSIZE];
-
-	superblock[0] = 1;
-	superblock[1] = VALID_BYTE;
-	superblock[2] = 1; 
-	//need to implement free block list
-	//superblock[3] = free block list pointer <= numBlocks - 2;
-	writeBlock(disk, 0, superblock);
-
-	char inode[BLOCKSIZE];	
-	inode[0] = 2;
-	inode[1] = VALID_BYTE;
-	//linked list of structs?, need file name and metadata 
-	
-	writeBlock(disk, 1, superblock);
-
-	//leave block 3 blank?? have to change i in for loop then
-	
-	char freeBlock[BLOCKSIZE];
-	freeBlock[0] = 4;
-	freeBlock[1] = VALID_BYTE;
-	//freeBlock[2] = 4? 
-	
-	for(int i = 2; i<numBlocks; i++){
-		writeBlock(disk, i,freeBlock);
+	if (disk < 0)
+	{
+		return disk; // return error code from openDisk
 	}
 
-	//types of blocks
-	//first block is superblock
-	//second block is inode
-	//thirds block is file extent - means block as file data
-	//fourth block is free block
-	
-	//in each block:
-	//byte 0 to show what type of block it is(check page 3)
-	//byte 1 is 0x44 (what is this?? idk)
-	//2nd block is address of another block(what this mean?)
-	//3nd empty
-	//4 first byte of data, says to initialize all data to 0x00 sooo
+	int numBlocks = nBytes / BLOCKSIZE;
+	if (numBlocks < 2)
+	{
+		closeDisk(disk);
+		return invalidNByteSize;
+	}
+
+	// initialize block
+	char block[BLOCKSIZE];
+	memset(block, 0x00, BLOCKSIZE);
+
+	// superblock creation
+	block[0] = BLOCK_TYPE_SUPERBLOCK;
+	block[1] = VALID_BYTE;
+	block[2] = 2;			   // pointer to first free block
+	block[3] = ROOT_INODE_NUM; // root inode is at block 1
+
+	if (writeBlock(disk, SUPERBLOCK_NUM, block) < 0)
+	{
+		closeDisk(disk);
+		return writeBlockFuncFailure;
+	}
+
+	// write root inode
+	memset(block, 0x00, BLOCKSIZE);
+
+	block[0] = BLOCK_TYPE_INODE;
+	block[1] = VALID_BYTE;
+
+	if (writeBlock(disk, ROOT_INODE_NUM, block) < 0)
+	{
+		closeDisk(disk);
+		return writeBlockFuncFailure;
+	}
+
+	// initialize remaining blocks as free blocks
+	for (int i = 2; i < numBlocks; i++)
+	{
+		memset(block, 0x00, BLOCKSIZE);
+
+		block[0] = BLOCK_TYPE_FREE;
+		block[1] = VALID_BYTE;
+
+		// link to next free block, or 0 if this is the last block
+		if (i < numBlocks - 1)
+		{
+			block[2] = i + 1; // points to next free block
+		}
+		else
+		{
+			block[2] = 0x00; // if no next free block
+		}
+
+		if (writeBlock(disk, i, block) < 0)
+		{
+			closeDisk(disk);
+			return writeBlockFuncFailure;
+		}
+	}
+
+	closeDisk(disk);
 	return 0;
 }
-int tfs_mount(char *diskname){
-	if(curr_mounted_disk != -1){
+
+int tfs_mount(char *diskname)
+{
+	/* tfs_mount(char *diskname) “mounts” a TinyFS file system located within
+	‘diskname’. tfs_unmount(void) “unmounts” the currently mounted file
+	system. As part of the mount operation, tfs_mount should verify the file
+	system is the correct type. In tinyFS, only one file system may be
+	mounted at a time. Use tfs_unmount to cleanly unmount the currently
+	mounted file system. Must return a specified success/error code. */
+	if (curr_mounted_disk != -1)
+	{
 		return alreadyMounted;
 	}
-	int disk = openDisk(filename, nBytes);
-	if(disk<0){
-        return -1; //DECLARE ERROR  
-    }
 
-	curr_mounted = disk;
-	//from instructions: tfs_mount should verify the file
-	//system is the correct type
-	//0x44 -second byte of every block- is how you check if file is valid
-	
+	int disk = openDisk(diskname, 0);
+	if (disk < 0)
+	{
+		return disk; // return error code from openDisk
+	}
+
+	// make sure only one disk can be mounted
+
+	// verify
 	char buffer[BLOCKSIZE];
-
-	if(readBlock(disk, 0, buffer)<0){
-		return -1; //add in correct error code
-	}	
-	if(buffer[1] != VALID_BYTE){
-		printf("file not valid");
-		return -1; //add in correct error code
+	if (readBlock(disk, SUPERBLOCK_NUM, buffer) < 0)
+	{
+		closeDisk(disk);
+		return readBlockFuncFailure;
 	}
 
-	return 0;	
+	// check magic number ?? should be good enough
+	if (buffer[1] != VALID_BYTE)
+	{
+		closeDisk(disk);
+		return readBlockFuncFailure;
+	}
 
+	// check block type (byte 0 should be superblock type ?) ??
+	if (buffer[0] != BLOCK_TYPE_SUPERBLOCK)
+	{
+		closeDisk(disk);
+		return readBlockFuncFailure;
+	}
+
+	curr_mounted_disk = disk;
+	return 0;
 }
-int tfs_unmount(void){
-	if(curr_mounted_disk == -1){ //nthg to unmount
-		return -1; //add in correct error code
+
+int tfs_unmount(void)
+{
+	if (curr_mounted_disk == -1)
+	{
+		return -1; // no disk currently mounted (add error code ?)
 	}
-	closeDisk(curr_mounted_disk);
+
+	if (closeDisk(curr_mounted_disk) < 0)
+	{
+		return fileCloseFailure;
+	}
+
 	curr_mounted_disk = -1;
+	return 0;
 }
-
 
 fileDescriptor tfs_openFile(char *name);
 
-int tfs_closeFile(fileDescriptor FD){
+int tfs_closeFile(fileDescriptor FD)
+{
 	closeDisk(FD);
 }
 int tfs_writeFile(fileDescriptor FD, char *buffer, int size);
@@ -108,10 +161,11 @@ int tfs_deleteFile(fileDescriptor FD);
 
 int tfs_readByte(fileDescriptor FD, char *buffer);
 
-int tfs_seek(fileDescriptor FD, int offset){
-	if(lseek(disk, offset, SEEK_SET) == -1){
-		return -1; //add in correct code
+int tfs_seek(fileDescriptor FD, int offset)
+{
+	if (lseek(disk, offset, SEEK_SET) == -1)
+	{
+		return -1; // add in correct code
 	}
 	return 0;
 }
-
