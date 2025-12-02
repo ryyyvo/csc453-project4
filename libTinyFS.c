@@ -331,19 +331,37 @@ int tfs_writeFile(fileDescriptor FD, char *buffer, int size){
     if(!current){
         return -1; //error
     }
-	
+	char block[BLOCKSIZE];	
+
+	//char freeBlock = current->inodeBlockNum;
+	int nextFreeBlock;
+	char *buffer_ptr = buffer;
 	memset(block, 0x00, BLOCKSIZE);
 	for(int i = 2; i<numBlocks; i++){
 		block[0] = BLOCK_TYPE_FILE_EXTENT;
-		block[1] = VALID-BYTE;
-		block[2] = i+1; 
+		block[1] = VALID_BYTE;
+		nextFreeBlock = i+1;
+		block[2] = nextFreeBlock;
 		block[3] = 0x00;
+		memcpy(blk + 4, buffer_ptr, 252);
+		buffer_ptr += 252;
 		writeBlock(curr_mounted_disk, i, block);		
 	}
 
-	//have to update free head 
 
+	char inode[BLOCKSIZE];
+    if (readBlock(curr_mounted_disk, current->inodeBlockNum, inode) < 0) {
+        return readBlockFuncFailure;
+    }
+	inode[2] = nextFreeBlock;
+	inode[12] = numBlocks * BLOCKSIZE;
+	
+	//have to update nextFreeBlock in inode byte 2 
+	//have to chnage block[12-13] for size 
 
+	if (writeBlock(curr_mounted_disk, current->inodeBlockNum, inode) < 0){     
+		return -1; //error
+	}
 	current->currentOffset = 0;
 
 
