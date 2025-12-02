@@ -2,3 +2,9 @@
 2. review openDisk
 3. what are we reading from the disk files? binary? text?
 4. what is *block used for in readBlock
+
+
+
+to test:
+compile using  gcc libDisk.c diskTest.c -o diskTest
+then run ./diskTest
