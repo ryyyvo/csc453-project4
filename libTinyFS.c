@@ -369,6 +369,7 @@ int tfs_readByte(fileDescriptor FD, char *buffer){
 }
 int tfs_seek(fileDescriptor FD, int offset)
 {
+	//FD or curr_mounted_disk??
 	if (lseek(FD, offset, SEEK_SET) == -1)
 	{
 		return -1; // add in correct code
