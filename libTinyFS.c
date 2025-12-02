@@ -321,15 +321,55 @@ int tfs_closeFile(fileDescriptor FD)
 	closeDisk(FD);
 };
 
-int tfs_writeFile(fileDescriptor FD, char *buffer, int size);
+int tfs_writeFile(fileDescriptor FD, char *buffer, int size){
+	FileTableEntry *current = openFileTable;
+    
+	int numBlocks = size/(BLOCKSIZE-4);
+	while(current && current->fd != FD){
+        current = current->next;
+    }
+    if(!current){
+        return -1; //error
+    }
+	
+	memset(block, 0x00, BLOCKSIZE);
+	for(int i = 2; i<numBlocks; i++){
+		block[0] = BLOCK_TYPE_FILE_EXTENT;
+		block[1] = VALID-BYTE;
+		block[2] = i+1; 
+		block[3] = 0x00;
+		writeBlock(curr_mounted_disk, i, block);		
+	}
 
+	//have to update free head 
+
+
+	current->currentOffset = 0;
+
+
+
+}
 int tfs_deleteFile(fileDescriptor FD);
 
-int tfs_readByte(fileDescriptor FD, char *buffer);
+int tfs_readByte(fileDescriptor FD, char *buffer){
+	FileTableEntry *current = openFileTable;
+	while(current && current->fd != FD){
+		current = current->next;		
+	}
+	if(!current){
+		return -1; //error
+	}
 
+	tfs_seek(FD, current->currentOffset);
+	if(read(FD, buffer, 1) == -1){
+		return -1; //failure
+	}
+	current->currentOffset += 1;
+	return 0;
+}
 int tfs_seek(fileDescriptor FD, int offset)
 {
-	if (lseek(disk, offset, SEEK_SET) == -1)
+	if (lseek(FD, offset, SEEK_SET) == -1)
 	{
 		return -1; // add in correct code
 	}
