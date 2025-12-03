@@ -32,13 +32,13 @@ int openDisk(char *filename, int nBytes)
     }
 
 	nBytes -= (nBytes % BLOCKSIZE);
-	//fptr = fopen(filename, "w+"); // w+ if file new
-	fptr = open(filename, O_RDWR | O_CREAT, 0644); //0644 file perm mode
+
+	fptr = open(filename, O_RDWR | O_CREAT, 0644); 
 	ftruncate(fptr, nBytes);
 	if (fptr<0)
 	{
 		printf("can't create file");
-		return FILE_FUNC_ERROR; // make error for fopen failure
+		return FILE_FUNC_ERROR;
 	}
 
 	
@@ -47,7 +47,7 @@ int openDisk(char *filename, int nBytes)
 
 int closeDisk(int disk)
 {
-	// do we have to check if disk is a valid param?
+
 	if (close(disk) < 0)
 	{
 		return FILE_FUNC_ERROR;
