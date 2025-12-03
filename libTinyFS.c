@@ -490,7 +490,41 @@ int tfs_writeFile(fileDescriptor FD, char *buffer, int size)
 }
 
 int tfs_deleteFile(fileDescriptor FD){
-	tfs_closeFile(FD);
+	// find file in open file table
+	// 	FileTableEntry *current = openFileTable;
+	// 		FileTableEntry *prev = NULL;
+	//
+	// 			while (current && current->fd != FD)
+	// 				{
+	// 						prev = current;
+	// 								current = current->next;
+	// 									}
+	//
+	// 										if (!current)
+	// 											{
+	// 													return invalidFileDescriptor;
+	// 														}
+	//
+	// 															char inodeBlock[BLOCKSIZE];
+	// 																if (readBlock(curr_mounted_disk, current->inodeBlockNum, inodeBlock) < 0)
+	// 																	{
+	// 																			return readBlockFuncFailure;
+	// 																				}
+	//
+	// 																					if (current->inodeBlockNum == ROOT_INODE_NUM)
+	// 																						{
+	// 																								return -1; // prevent delete root inode
+	// 																									}
+	//
+	// 																										// get first extent block pointer and next inode pointer
+	// 																											int firstExtent = (unsigned char)inodeBlock[14];
+	// 																												int nextInode = (unsigned char)inodeBlock[2];
+
+
+
+
+
+
 }
 /*
 int tfs_readByte(fileDescriptor FD, char *buffer)
@@ -508,8 +542,7 @@ int tfs_readByte(fileDescriptor FD, char *buffer)
 	tfs_seek(FD, current->currentOffset);
 	if (read(FD, buffer, 1) == -1)
 	{
-		return -1; // failure
-	}
+		return -1; /	}
 	current->currentOffset += 1;
 	return 0;
 }
