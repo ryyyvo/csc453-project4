@@ -20,7 +20,7 @@ int openDisk(char *filename, int nBytes)
 		fptr = open(filename, O_RDWR);
 		if (fptr<0)
 		{
-			return diskNotExist;
+			return INVALID_ACCESS;
 		}
 		return fptr;
 	}
@@ -28,7 +28,7 @@ int openDisk(char *filename, int nBytes)
 	if (nBytes < BLOCKSIZE)
     {
         printf("nbytes less than blocksize not allowed");
-        return invalidNByteSize; // failure
+        return INVALID_SIZE;
     }
 
 	nBytes -= (nBytes % BLOCKSIZE);
@@ -38,17 +38,10 @@ int openDisk(char *filename, int nBytes)
 	if (fptr<0)
 	{
 		printf("can't create file");
-		return -4; // make error for fopen failure
+		return FILE_FUNC_ERROR; // make error for fopen failure
 	}
 
-	/*
-	char emptyData = 0;
-	for (int i = 0; i < nBytes; i++)
-	{
-		write(&emptyData, sizeof(emptyData), 1, fptr);
-	}
-	fflush(fptr);
-	*/
+	
 	return fptr;
 }
 
@@ -57,7 +50,7 @@ int closeDisk(int disk)
 	// do we have to check if disk is a valid param?
 	if (close(disk) < 0)
 	{
-		return fileCloseFailure;
+		return FILE_FUNC_ERROR;
 	}
 
 	return 0;
@@ -70,11 +63,11 @@ int readBlock(int disk, int bNum, void *block)
 	off_t offset = bNum * BLOCKSIZE;
 	if (lseek(disk, offset, SEEK_SET) == -1)
 	{
-		return readBlockFuncFailure;
+		return READ_FUNC_FAILURE;
 	}
 	if (read(disk, block, BLOCKSIZE) != BLOCKSIZE)
 	{
-		return readBlockFuncFailure;
+		return READ_FUNC_FAILURE;
 	}
 	return 0;
 }
@@ -84,11 +77,11 @@ int writeBlock(int disk, int bNum, void *block)
 	off_t offset = bNum * BLOCKSIZE;
 	if (lseek(disk, offset, SEEK_SET) == -1)
 	{
-		return writeBlockFuncFailure;
+		return WRITE_FUNC_FAILURE;
 	}
 	if (write(disk, block, BLOCKSIZE) == -1)
 	{
-		return writeBlockFuncFailure;
+		return WRITE_FUNC_FAILURE;
 	}
 	return 0;
 }
