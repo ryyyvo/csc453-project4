@@ -11,12 +11,6 @@ FileTableEntry *openFileTable = NULL;
 int nextFD = 0;
 
 int tfs_mkfs(char *filename, int nBytes)
-/* Makes a blank TinyFS file system of size nBytes on the unix file
-specified by ‘filename’. This function should use the emulated disk
-library to open the specified unix file, and upon success, format the
-file to be a mountable disk. This includes initializing all data to 0x00,
-setting magic numbers, initializing and writing the superblock and
-inodes, etc. Must return a specified success/error code. */
 {
 	int disk = openDisk(filename, nBytes);
 	if (disk < 0)
@@ -38,9 +32,7 @@ inodes, etc. Must return a specified success/error code. */
 	block[0] = BLOCK_TYPE_SUPERBLOCK;
 	block[1] = VALID_BYTE;
 
-	// byte 3 must be EMPTY so shifting things  a lil
-	// block[2] = 2;			   // pointer to first free block
-	// block[3] = ROOT_INODE_NUM; // root inode is at block 1
+	
 
 	block[2] = 2;			   // store pointer to free block
 	block[3] = 0x00;		   // byte3 must be empty for all blocks
@@ -86,18 +78,11 @@ inodes, etc. Must return a specified success/error code. */
 	}
 
 	closeDisk(disk);
-	//printf("end of print func");
 	return 0;
 }
 
 int tfs_mount(char *diskname)
 {
-	/* tfs_mount(char *diskname) “mounts” a TinyFS file system located within
-	‘diskname’. tfs_unmount(void) “unmounts” the currently mounted file
-	system. As part of the mount operation, tfs_mount should verify the file
-	system is the correct type. In tinyFS, only one file system may be
-	mounted at a time. Use tfs_unmount to cleanly unmount the currently
-	mounted file system. Must return a specified success/error code. */
 	if (curr_mounted_disk != -1)
 	{
 		return ALRDY_MOUNTED;
@@ -109,7 +94,7 @@ int tfs_mount(char *diskname)
 		return disk; // return error code from openDisk
 	}
 
-	// make sure only one disk can be mounted
+
 
 	// verify
 	char buffer[BLOCKSIZE];
@@ -154,10 +139,6 @@ int tfs_unmount(void)
 }
 
 fileDescriptor tfs_openFile(char *name)
-/* Creates or Opens a file for reading and writing on the currently
-mounted file system. Creates a dynamic resource table entry for the file,
-and returns a file descriptor (integer) that can be used to reference
-this entry while the filesystem is mounted. */
 {
 	if (curr_mounted_disk == -1)
 	{
@@ -274,13 +255,6 @@ this entry while the filesystem is mounted. */
 		}
 
 	
-		/*
-		// write new inode to disk
-		if (writeBlock(curr_mounted_disk, freeBlock, freeBlockData) < 0)
-		{
-			return writeBlockFuncFailure;
-		}
-		*/
 
 		char rootBlock[BLOCKSIZE];
 		// link new inode to root inode's chain
@@ -289,19 +263,11 @@ this entry while the filesystem is mounted. */
 			return READ_FUNC_FAILURE;
 		}
 		freeBlockData[2] = rootBlock[2];
-
-		 // write new inode to disk
-		 //         if (writeBlock(curr_mounted_disk, freeBlock, freeBlockData) < 0)
-		 //                 {
-		 //                             return writeBlockFuncFailure;
-		 //              
+        
 		if(writeBlock(curr_mounted_disk, freeBlock, freeBlockData) < 0){
 			return WRITE_FUNC_FAILURE;
 		}
 
-
-
-		//block[2] = freeBlock; // root inode now points to new inode
 		rootBlock[2] = freeBlock;
 		if (writeBlock(curr_mounted_disk, ROOT_INODE_NUM,rootBlock) < 0)
 		{
@@ -329,8 +295,6 @@ this entry while the filesystem is mounted. */
 }
 
 int tfs_closeFile(fileDescriptor FD)
-/* Closes the file, de-allocates all system resources, and removes table
-entry */
 {
 	if (FD < 0)
 	{
@@ -493,7 +457,7 @@ int tfs_writeFile(fileDescriptor FD, char *buffer, int size)
 
 
 int tfs_deleteFile(fileDescriptor FD)
-/* deletes a file and marks its blocks as free on disk. */
+
 {
 	// find file in open file table
 	FileTableEntry *current = openFileTable;
