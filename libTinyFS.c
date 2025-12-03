@@ -6,6 +6,7 @@
 #include "error.h"
 #include "libDisk.h"
 #include "libTinyFS.h"
+
 int curr_mounted_disk = -1; //-1 means nothing mounted
 FileTableEntry *openFileTable = NULL;
 int nextFD = 0;
@@ -122,7 +123,7 @@ int tfs_unmount(void)
 {
 	if (curr_mounted_disk == -1)
 	{
-		return INVALID_ACCESS; // no disk currently mounted (add error code ?)
+		return INVALID_ACCESS; // no disk currently mounted
 	}
 
 	if (closeDisk(curr_mounted_disk) < 0)
