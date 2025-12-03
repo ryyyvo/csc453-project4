@@ -310,9 +310,42 @@ this entry while the filesystem is mounted. */
 }
 
 int tfs_closeFile(fileDescriptor FD)
+/* Closes the file, de-allocates all system resources, and removes table
+entry */
 {
-	closeDisk(FD);
-};
+	if (FD < 0)
+	{
+		return invalidFileDescriptor;
+	}
+
+	// search for the file descriptor in open file table
+	FileTableEntry *current = openFileTable;
+	FileTableEntry *prev = NULL;
+
+	while (current != NULL)
+	{
+		if (current->fd == FD)
+		{
+			if (prev == NULL)
+			{
+				// removing head of list
+				openFileTable = current->next;
+			}
+			else
+			{
+				// remove middle/end
+				prev->next = current->next;
+			}
+
+			free(current);
+			return 0;
+		}
+
+		prev = current;
+		current = current->next;
+	}
+	return invalidFileDescriptor;
+}
 
 int tfs_writeFile(fileDescriptor FD, char *buffer, int size)
 {
