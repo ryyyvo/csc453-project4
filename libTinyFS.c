@@ -303,7 +303,7 @@ this entry while the filesystem is mounted. */
 
 		//block[2] = freeBlock; // root inode now points to new inode
 		rootBlock[2] = freeBlock;
-		if (writeBlock(curr_mounted_disk, ROOT_INODE_NUM, block) < 0)
+		if (writeBlock(curr_mounted_disk, ROOT_INODE_NUM,rootBlock) < 0)
 		{
 			return writeBlockFuncFailure;
 		}
