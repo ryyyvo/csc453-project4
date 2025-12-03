@@ -1,4 +1,3 @@
 Ishwarya Namburu, Ryan Vo
 
-Our TinyFS seems to be working well. We chose to do a linked list implementation for our free blocks. We also decided to design our inode block to look like: byte 0-3 as required, bytes4-11 file name, and byte 12-13 as file size. Initially we were using functions such as fopen() which gave us some difficulties, but after switching to functions like open() we found that the disk emulator worked better.
-We were unable to add additional functionality.
+Our TinyFS seems to be working well. We chose to do a linked list implementation for our free blocks. We also decided to design our inode block to look like: bytes 0-3 as required, bytes 4-11 as the file name, and bytes 12-13 as the file size, and byte 14 as a pointer to the first extent block. Each extent block stores 252 bytes of data, meaning files larger than 252 bytes would require multiple extent blocks linked together. Initially, we were using functions such as fopen() which gave us some difficulties, but after switching to functions like open(), we found that the disk emulator worked better. We were unable to add additional functionality.
