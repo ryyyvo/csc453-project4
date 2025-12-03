@@ -13,6 +13,8 @@
 #define SUPERBLOCK_NUM 0
 #define ROOT_INODE_NUM 1
 
+typedef int fileDescriptor;
+
 // tracks open files
 typedef struct FileTableEntry
 {
@@ -22,8 +24,6 @@ typedef struct FileTableEntry
     int currentOffset;
     struct FileTableEntry *next;
 } FileTableEntry;
-
-typedef int fileDescriptor;
 
 // function prototypes
 int tfs_mkfs(char *filename, int nBytes);

@@ -6,7 +6,6 @@
 #include "error.h"
 #include "libDisk.h"
 #include "libTinyFS.h"
-#include <string.h>
 int curr_mounted_disk = -1; //-1 means nothing mounted
 FileTableEntry *openFileTable = NULL;
 int nextFD = 0;
@@ -25,14 +24,13 @@ inodes, etc. Must return a specified success/error code. */
 		return disk; // return error code from openDisk
 	}
 
-	int numBlocks = (nBytes - (nBytes%BLOCKSIZE)) / BLOCKSIZE;
-	if (numBlocks < 3) //need atleast one free block to store something, or it's a useless file
+	int numBlocks = (nBytes - (nBytes % BLOCKSIZE)) / BLOCKSIZE;
+	if (numBlocks < 3) // need atleast one free block to store something, or it's a useless file
 	{
 		closeDisk(disk);
 		return invalidNByteSize;
 	}
 
-	// initialize block #1
 	char block[BLOCKSIZE];
 	memset(block, 0x00, BLOCKSIZE);
 
@@ -40,14 +38,13 @@ inodes, etc. Must return a specified success/error code. */
 	block[0] = BLOCK_TYPE_SUPERBLOCK;
 	block[1] = VALID_BYTE;
 
-	//byte 3 must be EMPTY so shifting things  a lil
-	//block[2] = 2;			   // pointer to first free block
-	//block[3] = ROOT_INODE_NUM; // root inode is at block 1
-	
+	// byte 3 must be EMPTY so shifting things  a lil
+	// block[2] = 2;			   // pointer to first free block
+	// block[3] = ROOT_INODE_NUM; // root inode is at block 1
 
-	block[2] = 2; //store pointer to free block
-	block[3] = 0x00; //byte3 must be empty for all blocks
-	block[4] = ROOT_INODE_NUM; //root inode
+	block[2] = 2;			   // store pointer to free block
+	block[3] = 0x00;		   // byte3 must be empty for all blocks
+	block[4] = ROOT_INODE_NUM; // root inode
 	if (writeBlock(disk, SUPERBLOCK_NUM, block) < 0)
 	{
 		closeDisk(disk);
@@ -79,10 +76,6 @@ inodes, etc. Must return a specified success/error code. */
 		{
 			block[2] = i + 1; // points to next free block
 		}
-		else
-		{
-			block[2] = 0x00; // if no next free block
-		}
 
 		block[3] = 0x00;
 		if (writeBlock(disk, i, block) < 0)
@@ -93,6 +86,7 @@ inodes, etc. Must return a specified success/error code. */
 	}
 
 	closeDisk(disk);
+	printf("end of print func");
 	return 0;
 }
 
@@ -279,19 +273,37 @@ this entry while the filesystem is mounted. */
 			freeBlockData[4 + i] = name[i];
 		}
 
+	
+		/*
 		// write new inode to disk
 		if (writeBlock(curr_mounted_disk, freeBlock, freeBlockData) < 0)
 		{
 			return writeBlockFuncFailure;
 		}
+		*/
 
+		char rootBlock[BLOCKSIZE];
 		// link new inode to root inode's chain
-		if (readBlock(curr_mounted_disk, ROOT_INODE_NUM, block) < 0)
+		if (readBlock(curr_mounted_disk, ROOT_INODE_NUM, rootBlock) < 0)
 		{
 			return readBlockFuncFailure;
 		}
-		block[2] = freeBlock; // root inode now points to new inode
-		if (writeBlock(curr_mounted_disk, ROOT_INODE_NUM, block) < 0)
+		freeBlockData[2] = rootBlock[2];
+
+		 // write new inode to disk
+		 //         if (writeBlock(curr_mounted_disk, freeBlock, freeBlockData) < 0)
+		 //                 {
+		 //                             return writeBlockFuncFailure;
+		 //              
+		if(writeBlock(curr_mounted_disk, freeBlock, freeBlockData) < 0){
+			return writeBlockFuncFailure;
+		}
+
+
+
+		//block[2] = freeBlock; // root inode now points to new inode
+		rootBlock[2] = freeBlock;
+		if (writeBlock(curr_mounted_disk, ROOT_INODE_NUM,rootBlock) < 0)
 		{
 			return writeBlockFuncFailure;
 		}
@@ -317,21 +329,387 @@ this entry while the filesystem is mounted. */
 }
 
 int tfs_closeFile(fileDescriptor FD)
+/* Closes the file, de-allocates all system resources, and removes table
+entry */
 {
-	closeDisk(FD);
-};
+	if (FD < 0)
+	{
+		return invalidFileDescriptor;
+	}
 
-int tfs_writeFile(fileDescriptor FD, char *buffer, int size);
+	// search for the file descriptor in open file table
+	FileTableEntry *current = openFileTable;
+	FileTableEntry *prev = NULL;
 
-int tfs_deleteFile(fileDescriptor FD);
+	while (current != NULL)
+	{
+		if (current->fd == FD)
+		{
+			if (prev == NULL)
+			{
+				// removing head of list
+				openFileTable = current->next;
+			}
+			else
+			{
+				// remove middle/end
+				prev->next = current->next;
+			}
 
-int tfs_readByte(fileDescriptor FD, char *buffer);
+			free(current);
+			return 0;
+		}
 
+		prev = current;
+		current = current->next;
+	}
+	return invalidFileDescriptor;
+}
+
+int tfs_writeFile(fileDescriptor FD, char *buffer, int size)
+{
+	FileTableEntry *current = openFileTable;
+	while (current && current->fd != FD)
+	{
+		current = current->next;
+	}
+	if (!current)
+	{
+		return -1;
+	}
+
+	char inodeBlock[BLOCKSIZE];
+	if (readBlock(curr_mounted_disk, current->inodeBlockNum, inodeBlock) < 0)
+	{
+		return readBlockFuncFailure;
+	}
+
+	// get number of extent blocks needed
+	int numBlocks = (size + 251) / 252;
+	if (numBlocks == 0 && size > 0)
+	{
+		numBlocks = 1;
+	}
+
+	int firstExtentBlock = 0;
+	int prevExtentBlock = 0;
+	int remainingSize = size;
+	int bufferOffset = 0;
+
+	// write extent blocks
+	for (int i = 0; i < numBlocks; i++)
+	{
+		// allocate block from free list
+		char superblock[BLOCKSIZE];
+		if (readBlock(curr_mounted_disk, SUPERBLOCK_NUM, superblock) < 0)
+		{
+			return readBlockFuncFailure;
+		}
+
+		int freeBlock = (unsigned char)superblock[2];
+		if (freeBlock == 0)
+		{
+			return -1;
+		}
+
+		// get next free block in chain
+		char freeBlockData[BLOCKSIZE];
+		if (readBlock(curr_mounted_disk, freeBlock, freeBlockData) < 0)
+		{
+			return readBlockFuncFailure;
+		}
+		int nextFreeBlock = (unsigned char)freeBlockData[2];
+
+		// update superblock to point to next free block
+		superblock[2] = nextFreeBlock;
+		if (writeBlock(curr_mounted_disk, SUPERBLOCK_NUM, superblock) < 0)
+		{
+			return writeBlockFuncFailure;
+		}
+
+		// initialize extent block
+		memset(freeBlockData, 0x00, BLOCKSIZE);
+		freeBlockData[0] = BLOCK_TYPE_FILE_EXTENT;
+		freeBlockData[1] = VALID_BYTE;
+
+		// calculate bytes to write in this extent
+		int bytesToWrite = (remainingSize > 252) ? 252 : remainingSize;
+
+		// copy data from buffer to extent block (bytes 4-255)
+		for (int j = 0; j < bytesToWrite; j++)
+		{
+			freeBlockData[4 + j] = buffer[bufferOffset + j];
+		}
+
+		// write extent block
+		if (writeBlock(curr_mounted_disk, freeBlock, freeBlockData) < 0)
+		{
+			return writeBlockFuncFailure;
+		}
+
+		// update previous extent block to point to this one
+		if (i > 0)
+		{
+			char prevExtentData[BLOCKSIZE];
+			if (readBlock(curr_mounted_disk, prevExtentBlock, prevExtentData) < 0)
+			{
+				return readBlockFuncFailure;
+			}
+			prevExtentData[2] = freeBlock; // link prev to curr
+			if (writeBlock(curr_mounted_disk, prevExtentBlock, prevExtentData) < 0)
+			{
+				return writeBlockFuncFailure;
+			}
+		}
+
+		// track first extent block
+		if (i == 0)
+		{
+			firstExtentBlock = freeBlock;
+		}
+
+		prevExtentBlock = freeBlock;
+		bufferOffset += bytesToWrite;
+		remainingSize -= bytesToWrite;
+	}
+
+	// update inode with first extent pointer and file size
+	inodeBlock[14] = firstExtentBlock;
+
+	inodeBlock[12] = (size >> 8) & 0xFF;
+	inodeBlock[13] = size & 0xFF;
+
+	if (writeBlock(curr_mounted_disk, current->inodeBlockNum, inodeBlock) < 0)
+	{
+		return writeBlockFuncFailure;
+	}
+
+	current->currentOffset = 0;
+
+	return 0;
+}
+
+
+
+
+int tfs_deleteFile(fileDescriptor FD)
+/* deletes a file and marks its blocks as free on disk. */
+{
+	// find file in open file table
+	FileTableEntry *current = openFileTable;
+	FileTableEntry *prev = NULL;
+
+	while (current && current->fd != FD)
+	{
+		prev = current;
+		current = current->next;
+	}
+
+	if (!current)
+	{
+		return invalidFileDescriptor;
+	}
+
+	char inodeBlock[BLOCKSIZE];
+	if (readBlock(curr_mounted_disk, current->inodeBlockNum, inodeBlock) < 0)
+	{
+		return readBlockFuncFailure;
+	}
+
+	if (current->inodeBlockNum == ROOT_INODE_NUM)
+	{
+		return -1; // prevent delete root inode
+	}
+
+	// get first extent block pointer and next inode pointer
+	int firstExtent = (unsigned char)inodeBlock[14];
+	int nextInode = (unsigned char)inodeBlock[2];
+
+	// get previous inode
+	char block[BLOCKSIZE];
+	int prevInodeBlock = ROOT_INODE_NUM;
+
+	if (readBlock(curr_mounted_disk, ROOT_INODE_NUM, block) < 0)
+	{
+		return readBlockFuncFailure;
+	}
+
+	// traverse to inode that points to the one being deleted
+	int currentInodeBlock = ROOT_INODE_NUM;
+	while (currentInodeBlock != 0)
+	{
+		if (readBlock(curr_mounted_disk, currentInodeBlock, block) < 0)
+		{
+			return readBlockFuncFailure;
+		}
+
+		int nextInodeInChain = (unsigned char)block[2];
+		if (nextInodeInChain == current->inodeBlockNum)
+		{
+			prevInodeBlock = currentInodeBlock;
+			break;
+		}
+
+		currentInodeBlock = nextInodeInChain;
+	}
+
+	// update previous inode to skip over deleted inode
+	if (readBlock(curr_mounted_disk, prevInodeBlock, block) < 0)
+	{
+		return readBlockFuncFailure;
+	}
+	block[2] = nextInode;
+	if (writeBlock(curr_mounted_disk, prevInodeBlock, block) < 0)
+	{
+		return writeBlockFuncFailure;
+	}
+
+	// return extent blocks to free list
+	int currentExtent = firstExtent;
+	while (currentExtent != 0)
+	{
+		char extentBlock[BLOCKSIZE];
+		if (readBlock(curr_mounted_disk, currentExtent, extentBlock) < 0)
+		{
+			return readBlockFuncFailure;
+		}
+
+		int nextExtent = (unsigned char)extentBlock[2];
+
+		// get current free list head
+		char superblock[BLOCKSIZE];
+		if (readBlock(curr_mounted_disk, SUPERBLOCK_NUM, superblock) < 0)
+		{
+			return readBlockFuncFailure;
+		}
+
+		int currentFreeHead = (unsigned char)superblock[2];
+
+		// mark extent as free and prepend to free list
+		memset(extentBlock, 0x00, BLOCKSIZE);
+		extentBlock[0] = BLOCK_TYPE_FREE;
+		extentBlock[1] = VALID_BYTE;
+		extentBlock[2] = currentFreeHead;
+
+		if (writeBlock(curr_mounted_disk, currentExtent, extentBlock) < 0)
+		{
+			return writeBlockFuncFailure;
+		}
+
+		// update superblock to point to this block
+		superblock[2] = currentExtent;
+		if (writeBlock(curr_mounted_disk, SUPERBLOCK_NUM, superblock) < 0)
+		{
+			return writeBlockFuncFailure;
+		}
+
+		currentExtent = nextExtent;
+	}
+
+	// return inode block to free list
+	char superblock[BLOCKSIZE];
+	if (readBlock(curr_mounted_disk, SUPERBLOCK_NUM, superblock) < 0)
+	{
+		return readBlockFuncFailure;
+	}
+
+	int currentFreeHead = (unsigned char)superblock[2];
+
+	// mark inode as free and prepend to free list
+	memset(inodeBlock, 0x00, BLOCKSIZE);
+	inodeBlock[0] = BLOCK_TYPE_FREE;
+	inodeBlock[1] = VALID_BYTE;
+	inodeBlock[2] = currentFreeHead;
+
+	if (writeBlock(curr_mounted_disk, current->inodeBlockNum, inodeBlock) < 0)
+	{
+		return writeBlockFuncFailure;
+	}
+
+	superblock[2] = current->inodeBlockNum;
+	if (writeBlock(curr_mounted_disk, SUPERBLOCK_NUM, superblock) < 0)
+	{
+		return writeBlockFuncFailure;
+	}
+
+	// remove from open file table
+	if (prev == NULL)
+	{
+		openFileTable = current->next;
+	}
+	else
+	{
+		prev->next = current->next;
+	}
+
+	free(current);
+
+	return 0;
+}
+
+int tfs_readByte(fileDescriptor FD, char *buffer){
+	FileTableEntry *current = openFileTable;
+    while (current && current->fd != FD)
+    {
+        current = current->next;
+    }
+    if (!current)
+    {
+        return -1; // error
+    }
+
+	char inode[BLOCKSIZE];
+	if (readBlock(curr_mounted_disk, current->inodeBlockNum, inode) < 0){
+	    return readBlockFuncFailure;
+	}
+
+
+	//int size = inode[12]; //IS THIS CORRECT?
+	int size = ((unsigned char)inode[12] << 8) | (unsigned char)inode[13];
+	int offset = current->currentOffset;
+	if(offset >= size){
+		return -1; //reached end of file
+	}
+
+	/*int offset = current->currentOffset;*/
+	int blockToGoTo = offset/252;
+	int inBlock = offset%252;
+	char block[BLOCKSIZE];
+	int extent = inode[14];
+	for(int i = 0; i<blockToGoTo; i++){
+		if(readBlock(curr_mounted_disk,extent, block)<0){
+			return -1;
+		}
+		extent = (unsigned char)block[2]; 
+		//check if ended before 
+	}
+	
+	if(readBlock(curr_mounted_disk, extent, block) < 0){
+        return readBlockFuncFailure;
+	}
+
+    *buffer = block[4 + inBlock];
+	current->currentOffset++;
+	return 0;	
+}
 int tfs_seek(fileDescriptor FD, int offset)
 {
-	if (lseek(disk, offset, SEEK_SET) == -1)
-	{
-		return -1; // add in correct code
+	FileTableEntry *current = openFileTable;
+    while (current && current->fd != FD)
+    {
+        current = current->next;
+    }
+    if (!current)
+    {
+        return -1; // error
+    }
+	char inode[BLOCKSIZE];
+    if (readBlock(curr_mounted_disk, current->inodeBlockNum, inode) < 0){
+        return readBlockFuncFailure;
 	}
+
+
+	int size = ((unsigned char)inode[12] << 8) | (unsigned char)inode[13];
+	current->currentOffset = offset;
 	return 0;
 }
