@@ -1,7 +1,10 @@
-#define invalidNByteSize -1
-#define diskNotExist -2
-#define fileCloseFailure -3
-#define readBlockFuncFailure -4
-#define writeBlockFuncFailure -5
-#define alreadyMounted -6
-#define invalidFileDescriptor -7
+#define INVALID_SIZE -1
+#define NODISK -2
+#define FILENOTCLOSE -3
+#define READ_FUNC_FAILURE -4
+#define WRITE_FUNC_FAILURE -5
+#define ALRDY_MOUNTED -6
+#define INVALID_FD -7
+#define FILE_FUNC_ERROR -8
+#define NTHG_MOUNTED -9
+#define INVALID_ACCESS -10
