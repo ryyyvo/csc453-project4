@@ -86,6 +86,7 @@ inodes, etc. Must return a specified success/error code. */
 	}
 
 	closeDisk(disk);
+	printf("end of print func");
 	return 0;
 }
 
@@ -272,18 +273,36 @@ this entry while the filesystem is mounted. */
 			freeBlockData[4 + i] = name[i];
 		}
 
+	
+		/*
 		// write new inode to disk
 		if (writeBlock(curr_mounted_disk, freeBlock, freeBlockData) < 0)
 		{
 			return writeBlockFuncFailure;
 		}
+		*/
 
+		char rootBlock[BLOCKSIZE];
 		// link new inode to root inode's chain
-		if (readBlock(curr_mounted_disk, ROOT_INODE_NUM, block) < 0)
+		if (readBlock(curr_mounted_disk, ROOT_INODE_NUM, rootBlock) < 0)
 		{
 			return readBlockFuncFailure;
 		}
-		block[2] = freeBlock; // root inode now points to new inode
+		freeBlockData[2] = rootBlock[2];
+
+		 // write new inode to disk
+		 //         if (writeBlock(curr_mounted_disk, freeBlock, freeBlockData) < 0)
+		 //                 {
+		 //                             return writeBlockFuncFailure;
+		 //              
+		if(writeBlock(curr_mounted_disk, freeBlock, freeBlockData) < 0){
+			return writeBlockFuncFailure;
+		}
+
+
+
+		//block[2] = freeBlock; // root inode now points to new inode
+		rootBlock[2] = freeBlock;
 		if (writeBlock(curr_mounted_disk, ROOT_INODE_NUM, block) < 0)
 		{
 			return writeBlockFuncFailure;
@@ -470,8 +489,10 @@ int tfs_writeFile(fileDescriptor FD, char *buffer, int size)
 	return 0;
 }
 
-int tfs_deleteFile(fileDescriptor FD);
-
+int tfs_deleteFile(fileDescriptor FD){
+	tfs_closeFile(FD);
+}
+/*
 int tfs_readByte(fileDescriptor FD, char *buffer)
 {
 	FileTableEntry *current = openFileTable;
@@ -492,12 +513,74 @@ int tfs_readByte(fileDescriptor FD, char *buffer)
 	current->currentOffset += 1;
 	return 0;
 }
+
+*/
+int tfs_readByte(fileDescriptor FD, char *buffer){
+	FileTableEntry *current = openFileTable;
+    while (current && current->fd != FD)
+    {
+        current = current->next;
+    }
+    if (!current)
+    {
+        return -1; // error
+    }
+
+	char inode[BLOCKSIZE];
+	if (readBlock(curr_mounted_disk, current->inodeBlockNum, inode) < 0){
+	    return readBlockFuncFailure;
+	}
+
+
+	//int size = inode[12]; //IS THIS CORRECT?
+	int size = ((unsigned char)inode[12] << 8) | (unsigned char)inode[13];
+	int offset = current->currentOffset;
+	if(offset >= size){
+		return -1; //reached end of file
+	}
+
+	/*int offset = current->currentOffset;*/
+	int blockToGoTo = offset/252;
+	int inBlock = offset%252;
+	char block[BLOCKSIZE];
+	int extent = inode[14];
+	for(int i = 0; i<blockToGoTo; i++){
+		if(readBlock(curr_mounted_disk,extent, block)<0){
+			return -1;
+		}
+		extent = (unsigned char)block[2]; 
+		//check if ended before 
+	}
+	/*char block[BLOCKSIZE];	
+	readBlock(curr_mounted_disk, blockToGoTo, block);
+	*buffer = block[4+inBlock];
+	*/
+	if(readBlock(curr_mounted_disk, extent, block) < 0){
+        return readBlockFuncFailure;
+	}
+    // 7. Grab the byte from data area (starts at byte 4)
+    *buffer = block[4 + inBlock];
+	current->currentOffset++;
+	return 0;	
+}
 int tfs_seek(fileDescriptor FD, int offset)
 {
-	// FD or curr_mounted_disk??
-	if (lseek(FD, offset, SEEK_SET) == -1)
-	{
-		return -1; // add in correct code
+	FileTableEntry *current = openFileTable;
+    while (current && current->fd != FD)
+    {
+        current = current->next;
+    }
+    if (!current)
+    {
+        return -1; // error
+    }
+	char inode[BLOCKSIZE];
+    if (readBlock(curr_mounted_disk, current->inodeBlockNum, inode) < 0){
+        return readBlockFuncFailure;
 	}
+
+
+	int size = ((unsigned char)inode[12] << 8) | (unsigned char)inode[13];
+	current->currentOffset = offset;
 	return 0;
 }
